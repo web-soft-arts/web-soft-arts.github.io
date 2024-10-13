@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperLiteMediaPlayer(仮)</title>
+    <style>
+        /* スクロールバーを完全に削除 */
+        html, body {
+            margin: 0; /* デフォルトのマージンをリセット */
+            font-family: Arial, sans-serif; /* フォントを設定 */
+        }
+
+        /* プレイヤー全体のスタイル */
+        .custom-player {
+            display: flex;
+            flex-direction: column;
+            width: 90%; /* 幅を90%に設定 */
+            max-width: 600px; /* 最大幅を600pxに制限 */
+            margin: 20px auto; /* 自動マージンで中央寄せ */
+            background-color: #222; /* プレイヤーの背景色を設定 */
+            border-radius: 5px; /* 角を丸める */
+            padding: 10px; /* パディングを追加 */
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .controls button {
+            background-color: #555;
+            border: none;
+            color: white;
+            padding: 10px 15px; /* ボタンのパディングを調整 */
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.3s; /* ホバー時の変化をスムーズに */
+            flex: 1; /* ボタンの幅を均等にする */
+            margin: 0 5px; /* ボタン間のマージンを追加 */
+        }
+
+        .controls button:hover {
+            background-color: #777;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #777;
+            border-radius: 2.5px;
+            overflow: hidden;
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .progress {
+            height: 100%;
+            background-color: #4caf50;
+            width: 0;
+        }
+
+        .seekbar {
+            width: 100%;
+        }
+
+        .time-display {
+            font-size: 14px;
+            color: #fff;
+            margin: 5px 0; /* マージンを調整 */
+            text-align: center; /* 中央揃え */
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                flex-direction: column; /* スマホサイズでは縦に並べる */
+                align-items: flex-start; /* 左寄せ */
+            }
+            .controls button {
+                margin: 5px 0; /* ボタン間のマージンを調整 */
+                width: 100%; /* ボタンの幅を100%にする */
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SuperLiteMediaPlayer(仮)</h1>
+
+    <input type="file" id="mediaInput" accept="audio/*,video/*">
+
+    <div class="custom-player" id="mediaPlayer">
+        <div id="mediaContainer"></div>
+
+        <div class="controls">
+            <button id="rewindBtn">⏪ 10秒戻る</button>
+            <button id="playPauseBtn">再生</button>
+            <button id="forwardBtn">10秒進む ⏩</button>
+            <input type="range" id="volume" class="volume-slider" value="1" min="0" max="1" step="0.01">
+            <span id="volumeLabel">100%</span>
+        </div>
+
+        <!-- プログレスバー -->
+
+        <!-- 時間表示をプログレスバーの下に配置 -->
+        <div class="time-display">
+            <span id="currentTime">00:00</span> / <span id="duration">00:00</span>
+        </div>
+
+        <!-- シークバー -->
+        <input type="range" id="seekbar" class="seekbar" value="0" min="0" step="0.01">
+    </div>
+
+    <script>
+        const mediaInput = document.getElementById('mediaInput');
+        const mediaContainer = document.getElementById('mediaContainer');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const rewindBtn = document.getElementById('rewindBtn');
+        const forwardBtn = document.getElementById('forwardBtn');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const durationDisplay = document.getElementById('duration');
+        const volumeSlider = document.getElementById('volume');
+        const volumeLabel = document.getElementById('volumeLabel');
+        const seekbar = document.getElementById('seekbar');
+        const progressBar = document.getElementById('progress');
+
+        let mediaElement;
+        let isPlaying = false;
+
+        mediaInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            mediaContainer.innerHTML = '';
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                const audioExtensions = ['mp3', 'wav', 'ogg'];
+                const videoExtensions = ['mp4', 'webm', 'ogg'];
+
+                if (audioExtensions.includes(fileExtension)) {
+                    mediaElement = document.createElement('audio');
+                } else if (videoExtensions.includes(fileExtension)) {
+                    mediaElement = document.createElement('video');
+                    mediaElement.width = 600;
+                } else {
+                    mediaContainer.innerHTML = '<p>このファイル形式はサポートされていません。</p>';
+                    return;
+                }
+
+                mediaElement.src = fileURL;
+                mediaElement.style.height = "50vh"; // 動画の高さを設定
+                mediaElement.style.width = "100%"; // 幅を100%に設定
+                mediaElement.style.marginBottom = "10px";
+                mediaContainer.appendChild(mediaElement);
+
+                // 再生・停止ボタンのイベント
+                playPauseBtn.addEventListener('click', togglePlayPause);
+
+                // 10秒戻るボタンのイベント
+                rewindBtn.addEventListener('click', function() {
+                    mediaElement.currentTime = Math.max(0, mediaElement.currentTime - 10);
+                });
+
+                // 10秒進むボタンのイベント
+                forwardBtn.addEventListener('click', function() {
+                    mediaElement.currentTime = Math.min(mediaElement.duration, mediaElement.currentTime + 10);
+                });
+
+                // シークバーの操作
+                seekbar.addEventListener('input', function() {
+                    mediaElement.currentTime = seekbar.value;
+                });
+
+                // 音量の操作
+                volumeSlider.addEventListener('input', function() {
+                    mediaElement.volume = volumeSlider.value;
+                    volumeLabel.textContent = `${Math.round(volumeSlider.value * 100)}%`;
+                });
+
+                // メディアの再生中に時間表示、シークバー、プログレスバーを更新
+                mediaElement.addEventListener('timeupdate', function() {
+                    const currentMinutes = Math.floor(mediaElement.currentTime / 60);
+                    const currentSeconds = Math.floor(mediaElement.currentTime % 60);
+                    currentTimeDisplay.textContent = `${String(currentMinutes).padStart(2, '0')}:${String(currentSeconds).padStart(2, '0')}`;
+
+                    const durationMinutes = Math.floor(mediaElement.duration / 60);
+                    const durationSeconds = Math.floor(mediaElement.duration % 60);
+                    durationDisplay.textContent = `${String(durationMinutes).padStart(2, '0')}:${String(durationSeconds).padStart(2, '0')}`;
+
+                    seekbar.max = mediaElement.duration;
+                    seekbar.value = mediaElement.currentTime;
+
+                    const progressPercent = (mediaElement.currentTime / mediaElement.duration) * 100;
+                    progressBar.style.width = progressPercent + '%';
+                });
+
+                // メディアの再生が終了したらボタンをリセット
+                mediaElement.addEventListener('ended', function() {
+                    playPauseBtn.textContent = '再生';
+                    isPlaying = false;
+                });
+            }
+        });
+
+        function togglePlayPause() {
+            if (isPlaying) {
+                mediaElement.pause();
+                playPauseBtn.textContent = '再生';
+            } else {
+                mediaElement.play();
+                playPauseBtn.textContent = '停止';
+            }
+            isPlaying = !isPlaying;
+        }
+    </script>
+    <a href="about/">このソフトについて</a>
+</body>
+</html>
